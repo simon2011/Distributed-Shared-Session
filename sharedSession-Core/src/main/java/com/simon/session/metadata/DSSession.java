@@ -13,11 +13,15 @@ import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpSessionBindingEvent;
 import javax.servlet.http.HttpSessionBindingListener;
 import javax.servlet.http.HttpSessionContext;
+import javax.servlet.http.HttpSessionEvent;
+import javax.servlet.http.HttpSessionListener;
+
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import com.simon.session.opInterface.SessionClient;
+import com.simon.session.utils.ConfigUtil;
 
 
 
@@ -66,6 +70,7 @@ public class DSSession implements HttpSession  {
         this.metadata = new SessionMetaData();
         this.metadata.setId(id);
         this.isNew = true;
+        fireListener(true);
     }
     
 
@@ -239,8 +244,11 @@ public class DSSession implements HttpSession  {
                 logger.error("==========> Error occurs when invalidating session: " + this, ex);
             }
         }
+        fireListener(false);
 		
 	}
+	
+
 
 	@Override
 	public boolean isNew() {
@@ -273,6 +281,29 @@ public class DSSession implements HttpSession  {
         }
     }
     
+    /**
+     * 触发Session监听器
+     */
+    protected void fireListener(boolean isCreate) {
+		List<HttpSessionListener> listeners = ConfigUtil.httpSessionListeners;
+		if (listeners != null) {
+			HttpSessionEvent event = new HttpSessionEvent(this);
+			for (int i = 0; i < listeners.size(); i++) {
+				HttpSessionListener listener = listeners.get(i);
+				try {
+					if (isCreate) {
+						logger.debug("触发会话创建监听器，" + listener);
+						listener.sessionCreated(event);
+					} else {
+						logger.debug("触发会话失效监听器，" + listener);
+						listener.sessionDestroyed(event);
+					}
+				} catch (Throwable t) {
+					logger.error("会话创建监听器调用失败！" + listener, t);
+				}
+			}
+		}
+	}
     
 	@Override
 	public long getCreationTime() {
